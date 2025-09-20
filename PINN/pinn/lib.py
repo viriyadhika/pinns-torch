@@ -43,38 +43,55 @@ class Util:
 
 
 class SchrodingerData:
-    def __init__(self, util: Util, Exact, x_np, n_data, n_boundary, n_collocation, t_bound, x_bound):
+    def __init__(self, util: Util, Exact, x_np, n_data, n_boundary, n_collocation, t_bound: list[float], x_bound: list[float]):
         # data_points_X = n_data x (t, x)
         # collocation_X = n_data x (t, x)
 
         # x, t
-        rand_data_idx = torch.randint(0, x_np.shape[0], size=[n_data], device=device)
+        self.x_np = torch.tensor(x_np, device=device, dtype=torch.float32)
+        self.Exact = Exact
+        self.n_data = n_data
 
-        self.x_data = torch.tensor(x_np, device=device, dtype=torch.float32)[rand_data_idx].squeeze()
-        self.t_data = torch.zeros(size=(n_data, 1), device=device, dtype=torch.float32).squeeze()
+        self.n_boundary = n_boundary
+        self.util = util
+        self.n_collocation = n_collocation
+        self.x_bound = x_bound
+        self.t_bound = t_bound
 
-        Exact = torch.tensor(Exact, device=device)
+    def sample_data(self):
+        rand_data_idx = torch.randint(0, self.x_np.shape[0], size=[self.n_data], device=device)
+
+        x_data = self.x_np[rand_data_idx].squeeze()
+        t_data = torch.zeros(size=(self.n_data, 1), device=device, dtype=torch.float32).squeeze()
+
+        Exact = torch.tensor(self.Exact, device=device)
 
         real_part = torch.real(Exact[rand_data_idx,0])
         imag_part = torch.imag(Exact[rand_data_idx,0])
-        self.y_train = torch.stack([real_part, imag_part], dim=1)
+        y_train = torch.stack([real_part, imag_part], dim=1)
 
+        return x_data, t_data, y_train
 
-        # x, t
-        self.t_boundary = torch.rand(size=(n_boundary,), device=device) * (t_bound[1] - t_bound[0]) + t_bound[0]
-
-        self.t_low_boundary = self.t_boundary.clone()
-        self.x_low_boundary = torch.ones(n_boundary, device=device) * x_bound[0]
-
-
-        self.t_high_boundary = self.t_boundary.clone()
-        self.x_high_boundary= torch.ones(n_boundary, device=device) * x_bound[1]
-
+    def sample_collocation(self):
         # Get collocation points
-        collocation_points = util.lhs(n_collocation, 2)
+        collocation_points = self.util.lhs(self.n_collocation, 2)
 
-        self.x_collocation_points = x_bound[0] + collocation_points[:,0] * (x_bound[1] - x_bound[0])
-        self.t_collocation_points = t_bound[0] + collocation_points[:,1] * (t_bound[1] - t_bound[0])
+        x_collocation_points = self.x_bound[0] + collocation_points[:,0] * (self.x_bound[1] - self.x_bound[0])
+        t_collocation_points = self.t_bound[0] + collocation_points[:,1] * (self.t_bound[1] - self.t_bound[0])
+
+        return x_collocation_points, t_collocation_points
+
+    def sample_boundary(self):
+        t_boundary = torch.rand(size=(self.n_boundary,), device=device) * (self.t_bound[1] - self.t_bound[0]) + self.t_bound[0]
+
+        t_low_boundary = t_boundary.clone()
+        x_low_boundary = torch.ones(self.n_boundary, device=device) * self.x_bound[0]
+
+
+        t_high_boundary = t_boundary.clone()
+        x_high_boundary= torch.ones(self.n_boundary, device=device) * self.x_bound[1]
+
+        return t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary
 
 
 class SchrodingerModel(nn.Module):
@@ -125,28 +142,29 @@ def gradients(dy: torch.Tensor, dx: torch.Tensor):
     )[0]
 
 def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    [i.requires_grad_(True) for i in [schrodinger_data.x_high_boundary, schrodinger_data.t_high_boundary, schrodinger_data.x_low_boundary, schrodinger_data.t_low_boundary]]
-    upper_bound = schrodinger_model(schrodinger_data.x_high_boundary, schrodinger_data.t_high_boundary)
-    lower_bound = schrodinger_model(schrodinger_data.x_low_boundary, schrodinger_data.t_low_boundary)
+    t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary = schrodinger_data.sample_boundary()
+    [i.requires_grad_(True) for i in [t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary]]
+    upper_bound = schrodinger_model(x_high_boundary, t_high_boundary)
+    lower_bound = schrodinger_model(x_low_boundary, t_low_boundary)
     
     u_x_upper = gradients(
         upper_bound[:,0],
-        schrodinger_data.x_high_boundary
+        x_high_boundary
     )
     
     v_x_upper = gradients(
         upper_bound[:,1],
-        schrodinger_data.x_high_boundary
+        x_high_boundary
     )
     
     u_x_lower = gradients(
         lower_bound[:,0],
-        schrodinger_data.x_low_boundary
+        x_low_boundary
     )
     
     v_x_lower = gradients(
         lower_bound[:,1],
-        schrodinger_data.x_low_boundary
+        x_low_boundary
     )
     
     boundary_loss = (v_x_lower - v_x_upper)**2 + (u_x_lower - u_x_upper)**2
@@ -155,34 +173,35 @@ def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
     return boundary_loss
 
 def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    [i.requires_grad_(True) for i in [schrodinger_data.x_collocation_points, schrodinger_data.t_collocation_points]]
-    h_collocation = schrodinger_model(schrodinger_data.x_collocation_points, schrodinger_data.t_collocation_points)
+    x_collocation_points, t_collocation_points = schrodinger_data.sample_collocation()
+    [i.requires_grad_(True) for i in [x_collocation_points, t_collocation_points]]
+    h_collocation = schrodinger_model(x_collocation_points, t_collocation_points)
     u = h_collocation[:,0]
     v = h_collocation[:,1]
 
     u_x = gradients(
         u,
-        schrodinger_data.x_collocation_points,
+        x_collocation_points,
     )
     u_xx = gradients(
         u_x,
-        schrodinger_data.x_collocation_points,
+        x_collocation_points,
     )
     u_t = gradients(
         u,
-        schrodinger_data.t_collocation_points,
+        t_collocation_points,
     )
     v_x = gradients(
         v,
-        schrodinger_data.x_collocation_points,
+        x_collocation_points,
     )
     v_xx = gradients(
         v_x,
-        schrodinger_data.x_collocation_points,
+        x_collocation_points,
     )
     v_t = gradients(
         v,
-        schrodinger_data.t_collocation_points,
+        t_collocation_points,
     )
     f_u = u_t + 0.5*v_xx + (u**2 + v**2)*v
     f_v = v_t - 0.5*u_xx - (u**2 + v**2)*u
@@ -191,8 +210,9 @@ def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
     return f_loss
 
 def get_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    data_y = schrodinger_model(schrodinger_data.x_data, schrodinger_data.t_data)
-    data_loss = torch.mean((data_y - schrodinger_data.y_train)**2)
+    x_data, t_data, y_train = schrodinger_data.sample_data()
+    data_y = schrodinger_model(x_data, t_data)
+    data_loss = torch.mean((data_y - y_train)**2)
 
     boundary_loss = get_boundary_loss(schrodinger_model, schrodinger_data)
     f_loss = get_function_loss(schrodinger_model, schrodinger_data)
