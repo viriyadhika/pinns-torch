@@ -1,0 +1,1 @@
+sbatch --partition=gpunodes --nodelist=gpunode34 -c 1 --mem=4G --gres=gpu:1 -t 480 ensamble/run.sh

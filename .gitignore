@@ -167,3 +167,5 @@ outputs
 misc
 /misc
 /misc/
+.DS_Store
+wandb
