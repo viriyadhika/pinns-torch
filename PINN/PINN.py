@@ -56,7 +56,7 @@ if __name__ == '__main__':
                                   )
     
     epochs = 60000
-    schrodinger_model = SchrodingerModel(n_input=2, n_layer=3, n_out=2)
+    schrodinger_model = SchrodingerModel(n_input=2, n_layer=3, n_out=2,t_bound=[0, torch.pi / 2], x_bound=[-5, 5])
     optimizer = torch.optim.Adam(schrodinger_model.parameters())
     schrodinger_model.to(device)
     checkpoint_path = "./schrodinger_model.pt"

@@ -78,9 +78,15 @@ class SchrodingerData:
 
 
 class SchrodingerModel(nn.Module):
-    def __init__(self, n_input: int, n_layer: int, n_out: int):
+    def __init__(self, n_input: int, n_layer: int, n_out: int, x_bound: list[float], t_bound: list[float]):
         super().__init__()
         n_hidden = 100
+        # store bounds for scaling
+        self.register_buffer("x_lb", torch.tensor(x_bound[0], dtype=torch.float32))
+        self.register_buffer("x_ub", torch.tensor(x_bound[1], dtype=torch.float32))
+        self.register_buffer("t_lb", torch.tensor(t_bound[0], dtype=torch.float32))
+        self.register_buffer("t_ub", torch.tensor(t_bound[1], dtype=torch.float32))
+        
         self.first = self.block(n_input, n_hidden)
         self.hidden = nn.Sequential(*[self.block(n_hidden, n_hidden) for i in range(n_layer) ])
         self.last = nn.Linear(n_hidden, n_out)
@@ -102,7 +108,9 @@ class SchrodingerModel(nn.Module):
                 nn.init.zeros_(module.bias)
 
     def forward(self, x, t):
-        X = torch.stack([x, t], dim=1)
+        x_scaled = 2.0 * (x - self.x_lb) / (self.x_ub - self.x_lb) - 1.0
+        t_scaled = 2.0 * (t - self.t_lb) / (self.t_ub - self.t_lb) - 1.0
+        X = torch.stack([x_scaled, t_scaled], dim=1)
         return self.last(self.hidden(self.first(X)))
 
 
