@@ -70,10 +70,10 @@ def train(i: int):
                                         num_sample = N0,
                                         initial_fun = initial_fun,
                                         solution = ['u', 'v'])
-    
+
     N_b = 50
     pe_b = pinnstorch.data.PeriodicBoundaryCondition(mesh = mesh,
-                                                 num_sample = 50,
+                                                 num_sample = N_b,
                                                  derivative_order = 1,
                                                  solution = ['u', 'v'])
     
