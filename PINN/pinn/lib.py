@@ -106,98 +106,81 @@ class SchrodingerModel(nn.Module):
         return self.last(self.hidden(self.first(X)))
 
 
+def gradients(dy: torch.Tensor, dx: torch.Tensor):
+    return torch.autograd.grad(
+        dy,
+        dx,
+        grad_outputs=torch.ones_like(dy),
+        create_graph=True,
+        retain_graph=True,
+        allow_unused=False,
+    )[0]
+
 def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    x_high_boundary = schrodinger_data.x_high_boundary.clone().requires_grad_(True)
-    x_low_boundary = schrodinger_data.x_low_boundary.clone().requires_grad_(True)
-
-    upper_bound = schrodinger_model(x_high_boundary, schrodinger_data.t_high_boundary)
-    lower_bound = schrodinger_model(x_low_boundary, schrodinger_data.t_low_boundary)
-
-    u_x_upper = torch.autograd.grad(
-        torch.sum(upper_bound[:,0]),
-        x_high_boundary,
-        create_graph=True,
-    )[0]
-
-    v_x_upper = torch.autograd.grad(
-        torch.sum(upper_bound[:,1]),
-        x_high_boundary,
-        create_graph=True,
-    )[0]
-
-    u_x_lower = torch.autograd.grad(
-        torch.sum(lower_bound[:,0]),
-        x_low_boundary,
-        create_graph=True,
-    )[0]
-
-    v_x_lower = torch.autograd.grad(
-        torch.sum(lower_bound[:,1]),
-        x_low_boundary,
-        create_graph=True,
-    )[0]
-
+    [i.requires_grad_(True) for i in [schrodinger_data.x_high_boundary, schrodinger_data.t_high_boundary, schrodinger_data.x_low_boundary, schrodinger_data.t_low_boundary]]
+    upper_bound = schrodinger_model(schrodinger_data.x_high_boundary, schrodinger_data.t_high_boundary)
+    lower_bound = schrodinger_model(schrodinger_data.x_low_boundary, schrodinger_data.t_low_boundary)
+    
+    u_x_upper = gradients(
+        upper_bound[:,0],
+        schrodinger_data.x_high_boundary
+    )
+    
+    v_x_upper = gradients(
+        upper_bound[:,1],
+        schrodinger_data.x_high_boundary
+    )
+    
+    u_x_lower = gradients(
+        lower_bound[:,0],
+        schrodinger_data.x_low_boundary
+    )
+    
+    v_x_lower = gradients(
+        lower_bound[:,1],
+        schrodinger_data.x_low_boundary
+    )
+    
     boundary_loss = (v_x_lower - v_x_upper)**2 + (u_x_lower - u_x_upper)**2
     boundary_loss = torch.mean(boundary_loss)
 
     return boundary_loss
 
 def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    x_collocation_points = schrodinger_data.x_collocation_points.clone().requires_grad_(True)
-    t_collocation_points = schrodinger_data.t_collocation_points.clone().requires_grad_(True)
-
-    h_collocation = schrodinger_model(x_collocation_points, t_collocation_points)
-
+    [i.requires_grad_(True) for i in [schrodinger_data.x_collocation_points, schrodinger_data.t_collocation_points]]
+    h_collocation = schrodinger_model(schrodinger_data.x_collocation_points, schrodinger_data.t_collocation_points)
     u = h_collocation[:,0]
     v = h_collocation[:,1]
 
-    u_x = torch.autograd.grad(
+    u_x = gradients(
         u,
-        x_collocation_points,
-        torch.ones_like(u),
-        create_graph=True
+        schrodinger_data.x_collocation_points,
     )[0]
-
-    u_xx = torch.autograd.grad(
+    u_xx = gradients(
         u_x,
-        x_collocation_points,
-        torch.ones_like(u_x),
-        create_graph=True
+        schrodinger_data.x_collocation_points,
     )[0]
-
-    u_t = torch.autograd.grad(
+    u_t = gradients(
         u,
-        t_collocation_points,
-        torch.ones_like(u),
-        create_graph=True,
+        schrodinger_data.t_collocation_points,
     )[0]
-
-    v_x = torch.autograd.grad(
+    v_x = gradients(
         v,
-        x_collocation_points,
-        torch.ones_like(v),
-        create_graph=True
+        schrodinger_data.x_collocation_points,
     )[0]
-
-    v_xx = torch.autograd.grad(
+    v_xx = gradients(
         v_x,
-        x_collocation_points,
-        torch.ones_like(v_x),
-        create_graph=True
+        schrodinger_data.x_collocation_points,
     )[0]
-
-
-    v_t = torch.autograd.grad(
+    v_t = gradients(
         v,
-        t_collocation_points,
-        torch.ones_like(v),
-        create_graph=True
+        schrodinger_data.t_collocation_points,
     )[0]
-
     f_u = u_t + 0.5*v_xx + (u**2 + v**2)*v
     f_v = v_t - 0.5*u_xx - (u**2 + v**2)*u
+    f_loss = torch.mean(f_u**2) + torch.mean(f_v**2)
 
-    return torch.mean(f_u**2) + torch.mean(f_v**2)
+    return f_loss
 
 def get_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
     data_y = schrodinger_model(schrodinger_data.x_data, schrodinger_data.t_data)
