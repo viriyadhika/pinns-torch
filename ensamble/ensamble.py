@@ -131,6 +131,6 @@ if __name__ == "__main__":
                                      output_fn = output_fn,
                                      loss_fn = 'mse')
     
-    trainer = pl.Trainer(accelerator='gpu', devices=1, logger=wandb_logger)
+    trainer = pl.Trainer(accelerator='gpu', devices=1, logger=wandb_logger, max_epochs=60000)
     trainer.fit(model=model, datamodule=datamodule)
     trainer.validate(model=model, datamodule=datamodule)
