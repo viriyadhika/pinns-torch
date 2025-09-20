@@ -1,3 +1,3 @@
 #!/bin/bash
 
-python3 ensamble/ensamble.py
+python3 -m ensamble.ensamble

@@ -2,15 +2,10 @@ from typing import Dict
 
 import torch
 import numpy as np
+from lightning.pytorch.callbacks import ModelCheckpoint
 import lightning.pytorch as pl
 
 from lightning.pytorch.loggers import WandbLogger
-
-wandb_logger = WandbLogger(
-    entity="viriyadhika1",
-    project="pinn-lab1",
-    name="Open source Schrodinger PINN"
-)
 
 import pinnstorch
 
@@ -62,7 +57,7 @@ def read_data_fn(root_path):
 def initial_fun(x):
     return {'u': 2*1/np.cosh(x), 'v': np.zeros_like(x)}
 
-if __name__ == "__main__":
+def train(i: int):
     N0 = 50
     mesh = pinnstorch.data.PointCloud(root_dir='./data',
                                   read_data_fn=read_data_fn)
@@ -119,7 +114,11 @@ if __name__ == "__main__":
         outputs["f_v"] = v_t - 0.5 * u_xx - (outputs["u"] ** 2 + outputs["v"] ** 2) * outputs["u"]
 
         return outputs
-    
+    wandb_logger = WandbLogger(
+        entity="viriyadhika1",
+        project="pinn-lab1",
+        name=f"Open source Schrodinger PINN - {i}"
+    )
     train_datasets = [me_s, in_c, pe_b]
     val_dataset = val_s
     datamodule = pinnstorch.data.PINNDataModule(train_datasets = [me_s, in_c, pe_b],
@@ -131,6 +130,31 @@ if __name__ == "__main__":
                                      output_fn = output_fn,
                                      loss_fn = 'mse')
     
-    trainer = pl.Trainer(accelerator='gpu', devices=1, logger=wandb_logger, max_epochs=60000)
+
+    checkpoint_cb = ModelCheckpoint(
+        dirpath=f"checkpoints/{i}/",
+        filename="pinn-{epoch:04d}-{val_loss:.4f}",
+        monitor="val/loss",
+        mode="min",
+        save_top_k=1,       # best model
+        save_last=True,     # <-- always save last.ckpt
+        every_n_epochs=1000
+    )
+
+    trainer = pl.Trainer(
+        accelerator="gpu",
+        devices=1,
+        max_epochs=60000,
+        logger=wandb_logger,
+        callbacks=[checkpoint_cb]
+    )
+
     trainer.fit(model=model, datamodule=datamodule)
     trainer.validate(model=model, datamodule=datamodule)
+
+    return model
+
+if __name__ == '__main__':
+    n_ensamble = 5
+    for i in range(5):
+        o = train(i)
