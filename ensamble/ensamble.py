@@ -151,6 +151,7 @@ def train(i: int):
 
     trainer.fit(model=model, datamodule=datamodule)
     trainer.validate(model=model, datamodule=datamodule)
+    wandb_logger.experiment.finish()
 
     return model
 
