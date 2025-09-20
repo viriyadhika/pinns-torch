@@ -155,27 +155,27 @@ def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
     u_x = gradients(
         u,
         schrodinger_data.x_collocation_points,
-    )[0]
+    )
     u_xx = gradients(
         u_x,
         schrodinger_data.x_collocation_points,
-    )[0]
+    )
     u_t = gradients(
         u,
         schrodinger_data.t_collocation_points,
-    )[0]
+    )
     v_x = gradients(
         v,
         schrodinger_data.x_collocation_points,
-    )[0]
+    )
     v_xx = gradients(
         v_x,
         schrodinger_data.x_collocation_points,
-    )[0]
+    )
     v_t = gradients(
         v,
         schrodinger_data.t_collocation_points,
-    )[0]
+    )
     f_u = u_t + 0.5*v_xx + (u**2 + v**2)*v
     f_v = v_t - 0.5*u_xx - (u**2 + v**2)*u
     f_loss = torch.mean(f_u**2) + torch.mean(f_v**2)
