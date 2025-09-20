@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 import requests
 import os
 import logging
-from lib.lib import SchrodingerModel, SchrodingerData, Util, get_loss
+from pinn.lib import SchrodingerModel, SchrodingerData, Util, get_loss
 import wandb
 
 logging.basicConfig(
@@ -55,7 +55,7 @@ if __name__ == '__main__':
                                    x_bound=[-5, 5]
                                   )
     
-    epochs = 30000
+    epochs = 60000
     schrodinger_model = SchrodingerModel(n_input=2, n_layer=3, n_out=2)
     optimizer = torch.optim.Adam(schrodinger_model.parameters())
     schrodinger_model.to(device)
