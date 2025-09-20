@@ -15,8 +15,8 @@ class Util:
     def __init__(self):
         pass
 
-    def lhs(self, n_samples: int, n_dims: int, dtype=torch.float64, show_plot: bool = False):
-        spaces = torch.linspace(0, 1, n_samples + 1, dtype=dtype).to(device)
+    def lhs(self, n_samples: int, n_dims: int, show_plot: bool = False):
+        spaces = torch.linspace(0, 1, n_samples + 1).to(device)
 
         # We need to unsqueeze so that we can use broadcasting on the n_dims
         lower_bound = spaces[:-1].unsqueeze(1)
@@ -50,8 +50,8 @@ class SchrodingerData:
         # x, t
         rand_data_idx = torch.randint(0, x_np.shape[0], size=[n_data], device=device)
 
-        self.x_data = torch.tensor(x_np, device=device)[rand_data_idx].squeeze()
-        self.t_data = torch.zeros(size=(n_data, 1), device=device).squeeze()
+        self.x_data = torch.tensor(x_np, device=device, dtype=torch.float32)[rand_data_idx].squeeze()
+        self.t_data = torch.zeros(size=(n_data, 1), device=device, dtype=torch.float32).squeeze()
 
         Exact = torch.tensor(Exact, device=device)
 
@@ -61,7 +61,7 @@ class SchrodingerData:
 
 
         # x, t
-        self.t_boundary = torch.rand(size=(n_boundary,), dtype=torch.float64, device=device) * (t_bound[1] - t_bound[0]) + t_bound[0]
+        self.t_boundary = torch.rand(size=(n_boundary,), device=device) * (t_bound[1] - t_bound[0]) + t_bound[0]
 
         self.t_low_boundary = self.t_boundary.clone()
         self.x_low_boundary = torch.ones(n_boundary, device=device) * x_bound[0]
@@ -71,7 +71,7 @@ class SchrodingerData:
         self.x_high_boundary= torch.ones(n_boundary, device=device) * x_bound[1]
 
         # Get collocation points
-        collocation_points = util.lhs(n_collocation, 2, dtype=torch.float64)
+        collocation_points = util.lhs(n_collocation, 2)
 
         self.x_collocation_points = x_bound[0] + collocation_points[:,0] * (x_bound[1] - x_bound[0])
         self.t_collocation_points = t_bound[0] + collocation_points[:,1] * (t_bound[1] - t_bound[0])
@@ -83,13 +83,13 @@ class SchrodingerModel(nn.Module):
         n_hidden = 100
         self.first = self.block(n_input, n_hidden)
         self.hidden = nn.Sequential(*[self.block(n_hidden, n_hidden) for i in range(n_layer) ])
-        self.last = nn.Linear(n_hidden, n_out, dtype=torch.float64)
+        self.last = nn.Linear(n_hidden, n_out)
 
         self.apply(self._init_weights)
 
     def block(self, n_input, n_hidden):
         return nn.Sequential(*[
-            nn.Linear(n_input, n_hidden, dtype=torch.float64),
+            nn.Linear(n_input, n_hidden),
             nn.Tanh()
         ])
 
