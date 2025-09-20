@@ -23,7 +23,7 @@ class BayesianLinear(nn.Module):
         bias = self.bias_mu + torch.exp(0.5 * self.bias_logvar) * bias_eps
         return F.linear(x, weight, bias)
     
-    def kl_divergence(self):
+    def kl_divergence(self) -> torch.Tensor:
         prior_var = self.prior_std ** 2
         post_var = torch.exp(self.weight_logvar)
         kl = 0.5 * (
@@ -91,7 +91,7 @@ class BayesianFCN(nn.Module):
         net.add_module("output", output_layer)
         return net
 
-    def forward(self, spatial: List[torch.Tensor], time: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, spatial: List[torch.Tensor], time: torch.Tensor) -> tuple[Dict[str, torch.Tensor], torch.Tensor]:
         """Perform a single forward pass through the network.
 
         :param spatial: List of input spatial tensors.
@@ -133,10 +133,10 @@ class BayesianFCN(nn.Module):
         # Continuous Mode
         else:
             outputs_dict = {name: z[:, i : i + 1] for i, name in enumerate(self.output_names)}
-        return outputs_dict
+        return outputs_dict, self.kl_divergence()
 
     def kl_divergence(self):
-        kl = 0.0
+        kl = torch.tensor(0.0)
         for m in self.model.modules():
             if isinstance(m, BayesianLinear):
                 kl += m.kl_divergence()
