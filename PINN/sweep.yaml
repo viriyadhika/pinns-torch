@@ -15,6 +15,6 @@ parameters:
   prior_std:
     values: [0.3, 0.5, 1.0, 2.0]
   mc:
-    values: [1, 4, 8]
+    values: [1, 2, 4]
   clip_norm:
     values: [0.5, 1.0, 5.0]

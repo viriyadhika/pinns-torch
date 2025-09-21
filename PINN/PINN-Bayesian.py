@@ -61,7 +61,7 @@ if __name__ == '__main__':
     
     
     clip_norm = config.clip_norm
-    beta_scaling = config.beta_scaling
+    beta_scaling: float = config.beta_scaling
     lr = config.lr
     mc = config.mc
     prior_std = config.prior_std
@@ -78,6 +78,9 @@ if __name__ == '__main__':
 
         
         data_loss = boundary_loss = f_loss = torch.tensor(0.0, device=device)
+        data_loss = torch.tensor(0., device=device)
+        boundary_loss = torch.tensor(0., device=device)
+        f_loss = torch.tensor(0., device=device)
         for _ in range(mc):
             dl, bl, fl = get_loss(bayesian_fcn, schrodinger_data)
             data_loss += dl / mc; boundary_loss += bl / mc; f_loss += fl / mc
