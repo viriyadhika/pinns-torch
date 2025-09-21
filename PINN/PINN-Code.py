@@ -202,6 +202,12 @@ class PhysicsInformedNN:
                 print(f"It {it:6d} | Loss {L.item():.3e} | {dt:.2f}s")
                 t0 = time.time()
 
+        checkpoint_path = "PINN-Code.pt"
+        torch.save({
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.opt_adam.state_dict(),
+        }, checkpoint_path)
+
     def train_lbfgs(self):
         self.model.train()
 
