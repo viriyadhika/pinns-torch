@@ -146,28 +146,33 @@ def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
     [i.requires_grad_(True) for i in [t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary]]
     upper_bound = schrodinger_model(x_high_boundary, t_high_boundary)
     lower_bound = schrodinger_model(x_low_boundary, t_low_boundary)
+
+    u_upper = upper_bound[:,0]
+    v_upper = upper_bound[:,1]
+    u_lower = lower_bound[:,0]
+    v_lower = lower_bound[:,1]
     
     u_x_upper = gradients(
-        upper_bound[:,0],
+        u_upper,
         x_high_boundary
     )
     
     v_x_upper = gradients(
-        upper_bound[:,1],
+        v_upper,
         x_high_boundary
     )
     
     u_x_lower = gradients(
-        lower_bound[:,0],
+        u_lower,
         x_low_boundary
     )
     
     v_x_lower = gradients(
-        lower_bound[:,1],
+        v_lower,
         x_low_boundary
     )
     
-    boundary_loss = (v_x_lower - v_x_upper)**2 + (u_x_lower - u_x_upper)**2
+    boundary_loss = (v_x_lower - v_x_upper)**2 + (u_x_lower - u_x_upper)**2 + (u_upper - u_lower)**2 + (v_upper - v_lower)**2
     boundary_loss = torch.mean(boundary_loss)
 
     return boundary_loss
