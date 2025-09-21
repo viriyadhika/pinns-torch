@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import grad
 import matplotlib.pyplot as plt
+import wandb
 
 # ---------- Utilities ----------
 
@@ -175,9 +176,21 @@ class PhysicsInformedNN:
     def train_adam(self, n_iter=5000, log_every=10):
         self.model.train()
         t0 = time.time()
+        run = wandb.init(
+            reinit="finish_previous",
+            entity="viriyadhika1",
+            project="pinn-lab1",
+            name="Schrodinger PINN Code",
+            config={
+                "model": "Schrodinger PINN Code",
+            },
+        )
         for it in range(1, n_iter + 1):
             self.opt_adam.zero_grad()
             L = self.loss()
+            run.log({
+                "loss": L
+            })
             L.backward()
             self.opt_adam.step()
 
@@ -272,8 +285,7 @@ if __name__ == "__main__":
     t_train_start = time.time()
     # Adam stage (shorter than TF’s 50k if you like; you can do 50k too)
     pinn.train_adam(n_iter=50000, log_every=10)
-    # LBFGS stage
-    pinn.train_lbfgs()
+
     print(f"Training time: {time.time() - t_train_start:.2f}s")
 
     # Predict on full grid
