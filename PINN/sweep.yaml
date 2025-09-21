@@ -6,12 +6,12 @@ metric:
 parameters:
   lr:
     distribution: log_uniform
-    min: 0.0001
-    max: 0.01
+    min: -10
+    max: -5
   beta_scaling:
     distribution: log_uniform
-    min: 0.000001
-    max: 0.01
+    min: -10
+    max: -5
   prior_std:
     values: [0.3, 0.5, 1.0, 2.0]
   mc:
