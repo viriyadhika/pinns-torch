@@ -77,7 +77,7 @@ if __name__ == '__main__':
         optimizer.zero_grad()
 
         
-        data_loss = boundary_loss = f_loss = torch.tensor(0.0)
+        data_loss = boundary_loss = f_loss = torch.tensor(0.0, device=device)
         for _ in range(mc):
             dl, bl, fl = get_loss(bayesian_fcn, schrodinger_data)
             data_loss += dl / mc; boundary_loss += bl / mc; f_loss += fl / mc
