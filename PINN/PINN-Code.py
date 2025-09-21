@@ -13,6 +13,9 @@ import torch.optim as optim
 from torch.autograd import grad
 import matplotlib.pyplot as plt
 import wandb
+import os
+import logging
+import requests
 
 # ---------- Utilities ----------
 
@@ -251,9 +254,14 @@ if __name__ == "__main__":
     N_b = 50
     N_f = 20000
     layers = [2, 100, 100, 100, 100, 2]
+    os.makedirs("Data", exist_ok=True)
+    url = "https://github.com/maziarraissi/PINNs/raw/master/main/Data/NLS.mat"
+    r = requests.get(url)
+    with open("Data/NLS.mat", "wb") as f:
+        f.write(r.content)
 
     # Load data (Raissi NLS dataset)
-    data = scipy.io.loadmat("../Data/NLS.mat")
+    data = scipy.io.loadmat("Data/NLS.mat")
     t = data["tt"].flatten()[:, None]
     x = data["x"].flatten()[:, None]
     Exact = data["uu"]
