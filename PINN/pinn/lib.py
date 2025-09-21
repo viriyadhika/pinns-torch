@@ -8,6 +8,8 @@ import requests
 import os
 import logging
 
+from pinn.bayesian import BayesianFCN
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logging.info("Using " + device)
 
@@ -98,6 +100,10 @@ class SchrodingerModel(nn.Module):
     def __init__(self, n_input: int, n_layer: int, n_out: int, x_bound: list[float], t_bound: list[float]):
         super().__init__()
         n_hidden = 100
+        self.x_lb: torch.Tensor
+        self.x_ub: torch.Tensor
+        self.t_lb: torch.Tensor
+        self.t_ub: torch.Tensor
         # store bounds for scaling
         self.register_buffer("x_lb", torch.tensor(x_bound[0], dtype=torch.float32))
         self.register_buffer("x_ub", torch.tensor(x_bound[1], dtype=torch.float32))
@@ -141,11 +147,12 @@ def gradients(dy: torch.Tensor, dx: torch.Tensor):
         allow_unused=False,
     )[0]
 
-def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary = schrodinger_data.sample_boundary()
-    [i.requires_grad_(True) for i in [t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary]]
-    upper_bound = schrodinger_model(x_high_boundary, t_high_boundary)
-    lower_bound = schrodinger_model(x_low_boundary, t_low_boundary)
+def get_boundary_loss(
+        upper_bound: torch.Tensor, 
+        lower_bound: torch.Tensor, 
+        x_low_boundary: torch.Tensor, 
+        x_high_boundary: torch.Tensor
+    ):
 
     u_upper = upper_bound[:,0]
     v_upper = upper_bound[:,1]
@@ -177,13 +184,7 @@ def get_boundary_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
 
     return boundary_loss
 
-def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
-    x_collocation_points, t_collocation_points = schrodinger_data.sample_collocation()
-    [i.requires_grad_(True) for i in [x_collocation_points, t_collocation_points]]
-    h_collocation = schrodinger_model(x_collocation_points, t_collocation_points)
-    u = h_collocation[:,0]
-    v = h_collocation[:,1]
-
+def get_function_loss(u: torch.Tensor, v: torch.Tensor, x_collocation_points: torch.Tensor, t_collocation_points: torch.Tensor):
     u_x = gradients(
         u,
         x_collocation_points,
@@ -214,14 +215,26 @@ def get_function_loss(schrodinger_model: SchrodingerModel, schrodinger_data: Sch
 
     return f_loss
 
-def get_loss(schrodinger_model: SchrodingerModel, schrodinger_data: SchrodingerData):
+def get_loss(schrodinger_model: nn.Module, schrodinger_data: SchrodingerData):
+    # Data loss
     x_data, t_data, y_train = schrodinger_data.sample_data()
     data_y = schrodinger_model(x_data, t_data)
     data_loss = torch.mean((data_y - y_train)**2)
 
-    boundary_loss = get_boundary_loss(schrodinger_model, schrodinger_data)
-    f_loss = get_function_loss(schrodinger_model, schrodinger_data)
+    # Boundary loss
+    t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary = schrodinger_data.sample_boundary()
+    [i.requires_grad_(True) for i in [t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary]]
+    upper_bound = schrodinger_model(x_high_boundary, t_high_boundary)
+    lower_bound = schrodinger_model(x_low_boundary, t_low_boundary)
+    boundary_loss = get_boundary_loss(upper_bound, lower_bound, x_low_boundary, x_high_boundary)
 
+    ## Function loss
+    x_collocation_points, t_collocation_points = schrodinger_data.sample_collocation()
+    [i.requires_grad_(True) for i in [x_collocation_points, t_collocation_points]]
+    h_collocation = schrodinger_model(x_collocation_points, t_collocation_points)
+    u = h_collocation[:,0]
+    v = h_collocation[:,1]
+    f_loss = get_function_loss(u, v, x_collocation_points, t_collocation_points)
 
     return data_loss, boundary_loss, f_loss
 

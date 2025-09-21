@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import math
 
 class BayesianLinear(nn.Module):
-    def __init__(self, in_features, out_features, prior_std=0.1):
+    def __init__(self, in_features: int, out_features: int, prior_std: float):
         super().__init__()
         # Mean and log variance of weight distribution
         self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features).normal_(0, 0.1))
@@ -16,11 +16,15 @@ class BayesianLinear(nn.Module):
         self.bias_logvar = nn.Parameter(torch.ones(out_features) * -3)
         self.prior_std = prior_std
 
-    def forward(self, x, sample=True):
-        weight_eps = torch.randn_like(self.weight_mu)
-        bias_eps = torch.randn_like(self.bias_mu)
-        weight = self.weight_mu + torch.exp(0.5 * self.weight_logvar) * weight_eps
-        bias = self.bias_mu + torch.exp(0.5 * self.bias_logvar) * bias_eps
+    def forward(self, x, sample: bool = True):
+        if sample:
+            weight_eps = torch.randn_like(self.weight_mu)
+            bias_eps = torch.randn_like(self.bias_mu)
+            weight = self.weight_mu + torch.exp(0.5 * self.weight_logvar) * weight_eps
+            bias = self.bias_mu + torch.exp(0.5 * self.bias_logvar) * bias_eps
+        else:
+            weight = self.weight_mu
+            bias  = self.bias_mu
         return F.linear(x, weight, bias)
     
     def kl_divergence(self) -> torch.Tensor:
@@ -47,7 +51,7 @@ class BayesianFCN(nn.Module):
     """
     output_names: List[str]
     
-    def __init__(self, layers, lb, ub, output_names, discrete: bool = False) -> None:
+    def __init__(self, n_input: int, n_layer: int, n_out: int, x_bound: list[float], t_bound: list[float], prior_std=0.1) -> None:
         """Initialize a `FCN` module.
 
         :param layers: The list indicating number of neurons in each layer.
@@ -57,89 +61,52 @@ class BayesianFCN(nn.Module):
         :param discrete: If the problem is discrete or not.
         """
         super().__init__()
+        n_hidden = 50
+        self.x_lb: torch.Tensor
+        self.x_ub: torch.Tensor
+        self.t_lb: torch.Tensor
+        self.t_ub: torch.Tensor
+        # store bounds for scaling
+        self.register_buffer("x_lb", torch.tensor(x_bound[0], dtype=torch.float32))
+        self.register_buffer("x_ub", torch.tensor(x_bound[1], dtype=torch.float32))
+        self.register_buffer("t_lb", torch.tensor(t_bound[0], dtype=torch.float32))
+        self.register_buffer("t_ub", torch.tensor(t_bound[1], dtype=torch.float32))
+        
+        self.first = self.block(n_input, n_hidden, prior_std)
+        self.hidden: nn.ModuleList = nn.ModuleList([self.block(n_hidden, n_hidden, prior_std) for _ in range(n_layer)])
+        self.last = BayesianLinear(n_hidden, n_out, prior_std=prior_std)
 
-        self.model = self.initalize_net(layers)
-        self.lb: torch.Tensor
-        self.ub: torch.Tensor
-        self.register_buffer("lb", torch.tensor(lb, dtype=torch.float32, requires_grad=False))
-        self.register_buffer("ub", torch.tensor(ub, dtype=torch.float32, requires_grad=False))
-        self.output_names = output_names
-        self.discrete = discrete
+        self.apply(self._init_weights)
 
-    def initalize_net(self, layers: List):
-        """Initialize the layers of the neural network.
+    def block(self, n_input, n_hidden, prior_std) -> nn.Sequential:
+        return nn.Sequential(*[
+            BayesianLinear(n_input, n_hidden, prior_std),
+            nn.Tanh()
+        ])
+    
+    def _init_weights(self, module):
+        """Apply Xavier initialization to linear layers"""
+        if isinstance(module, BayesianLinear):
+            # Xavier uniform initialization (also called Glorot uniform)
+            nn.init.xavier_uniform_(module.weight_mu)
+            if module.bias_mu is not None:
+                nn.init.zeros_(module.bias_mu)
 
-        :param layers: The list indicating number of neurons in each layer.
-        :return: The initialized neural network.
-        """
-
-        initializer = nn.init.xavier_uniform_
-        net = nn.Sequential()
-
-        input_layer = BayesianLinear(layers[0], layers[1])
-        initializer(input_layer.weight_mu)
-
-        net.add_module("input", input_layer)
-        net.add_module("activation_1", nn.Tanh())
-
-        for i in range(1, len(layers) - 2):
-            hidden_layer = BayesianLinear(layers[i], layers[i + 1])
-            initializer(hidden_layer.weight_mu)
-            net.add_module(f"hidden_{i+1}", hidden_layer)
-            net.add_module(f"activation_{i+1}", nn.Tanh())
-
-        output_layer = BayesianLinear(layers[-2], layers[-1])
-        initializer(output_layer.weight_mu)
-        net.add_module("output", output_layer)
-        return net
-
-    def forward(self, spatial: List[torch.Tensor], time: torch.Tensor) -> tuple[Dict[str, torch.Tensor], torch.Tensor]:
-        """Perform a single forward pass through the network.
-
-        :param spatial: List of input spatial tensors.
-        :param time: Input tensor representing time.
-        :return: A tensor of solutions.
-        """
-
-        # Discrete Mode
-        if self.discrete:
-            if len(spatial) == 2:
-                x, y = spatial
-                z = torch.cat((x, y), 1)
-            elif len(spatial) == 3:
-                x, y, z = spatial
-                z = torch.cat((x, y, z), 1)
-            else:
-                z = spatial[0]
-            z = 2.0 * (z - self.lb[:-1]) / (self.ub[:-1] - self.lb[:-1]) - 1.0
-
-        # Continuous Mode
-        else:
-            if len(spatial) == 1:
-                x = spatial[0]
-                z = torch.cat((x, time), 1)
-            elif len(spatial) == 2:
-                x, y = spatial
-                z = torch.cat((x, y, time), 1)
-            else:
-                x, y, z = spatial
-                z = torch.cat((x, y, z, time), 1)
-            z = 2.0 * (z - self.lb) / (self.ub - self.lb) - 1.0
-
-        z = self.model(z)
-
-        # Discrete Mode
-        if self.discrete:
-            outputs_dict = {name: z for i, name in enumerate(self.output_names)}
-
-        # Continuous Mode
-        else:
-            outputs_dict = {name: z[:, i : i + 1] for i, name in enumerate(self.output_names)}
-        return outputs_dict, self.kl_divergence()
+    def forward(self, x, t, sample=True) -> torch.Tensor:
+        x_scaled = 2.0 * (x - self.x_lb) / (self.x_ub - self.x_lb) - 1.0
+        t_scaled = 2.0 * (t - self.t_lb) / (self.t_ub - self.t_lb) - 1.0
+        X = torch.stack([x_scaled, t_scaled], dim=1)
+        h = self.first[0](X, sample)  # BayesianLinear
+        h = self.first[1](h)          # Tanh
+        for layer in self.hidden:
+            h = layer[0](h, sample)
+            h = layer[1](h)
+        
+        return self.last(h, sample)
 
     def kl_divergence(self):
-        kl = torch.tensor(0.0)
-        for m in self.model.modules():
+        kl = torch.tensor(0.0, device=next(self.parameters()).device)
+        for m in self.modules():
             if isinstance(m, BayesianLinear):
                 kl += m.kl_divergence()
         return kl
