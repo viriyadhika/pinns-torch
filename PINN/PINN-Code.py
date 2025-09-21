@@ -39,14 +39,14 @@ def to_tensor(x, device):
 # ---------- Model ----------
 
 class MLP(nn.Module):
-    def __init__(self, layers, lb, ub):
+    def __init__(self, layers, lb, ub, device):
         """
         layers: e.g. [2, 100, 100, 100, 100, 2]
         lb, ub: numpy arrays of shape (2,) for [x_min, t_min], [x_max, t_max]
         """
         super().__init__()
-        self.lb = torch.as_tensor(lb, dtype=torch.float32)
-        self.ub = torch.as_tensor(ub, dtype=torch.float32)
+        self.lb = torch.as_tensor(lb, dtype=torch.float32, device=device)
+        self.ub = torch.as_tensor(ub, dtype=torch.float32, device=device)
 
         net = []
         for i in range(len(layers) - 1):
@@ -103,7 +103,7 @@ class PhysicsInformedNN:
         self.v0 = to_tensor(v0, self.device)
 
         # Model
-        self.model = MLP(layers, lb, ub).to(self.device)
+        self.model = MLP(layers, lb, ub, self.device).to(self.device)
 
         # Optimizers (Adam then LBFGS)
         self.opt_adam = optim.Adam(self.model.parameters(), lr=1e-3)
@@ -192,7 +192,7 @@ class PhysicsInformedNN:
             self.opt_adam.zero_grad()
             L = self.loss()
             run.log({
-                "loss": L
+                "loss": L.item()
             })
             L.backward()
             self.opt_adam.step()
