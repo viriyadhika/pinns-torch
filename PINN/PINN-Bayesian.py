@@ -12,6 +12,16 @@ from pinn.lib import SchrodingerModel, SchrodingerData, Util, get_loss
 from pinn.bayesian import BayesianFCN
 import wandb
 
+run = wandb.init(
+        reinit="finish_previous",
+        entity="viriyadhika1",
+        project="pinn-lab1",
+        name="Bayesian PINN"
+)
+
+# Sweep code
+config = wandb.config
+
 logging.basicConfig(
     filename='log.log',
     level=logging.INFO,
@@ -50,28 +60,18 @@ if __name__ == '__main__':
                                   )
     
     
-    clip_norm = 1
-    beta_scaling = 1e-3
-    lr = 1e-3
-    mc = 4
+    clip_norm = config.clip_norm
+    beta_scaling = config.beta_scaling
+    lr = config.lr
+    mc = config.mc
+    prior_std = config.prior_std
 
-    epochs = 60000
+    epochs = 10000
 
     bayesian_fcn = BayesianFCN(n_input=2,n_layer=3, n_out=2, t_bound=[0, torch.pi / 2],
-                                       x_bound=[-5, 5], prior_std=1)
+                                       x_bound=[-5, 5], prior_std=prior_std)
     optimizer = torch.optim.Adam(bayesian_fcn.parameters(), lr=lr)
     bayesian_fcn.to(device)
-    run = wandb.init(
-            reinit="finish_previous",
-            entity="viriyadhika1",
-            project="pinn-lab1",
-            name="Bayesian PINN",
-            config={
-                "model": "Bayesian PINN",
-                "epochs": epochs
-            },
-    )
-
 
     for i in range(epochs):
         optimizer.zero_grad()
