@@ -95,7 +95,8 @@ if __name__ == '__main__':
             'loss': loss.item(),
             'boundary_loss': boundary_loss.item(),
             'pde_loss': f_loss.item(),
-            'data_loss': data_loss.item()
+            'data_loss': data_loss.item(),
+            'kl_div': kl_divergence.item()
         })
 
         if i % 1000 == 0:
