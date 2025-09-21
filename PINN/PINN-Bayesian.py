@@ -55,7 +55,7 @@ if __name__ == '__main__':
     lr = 1e-3
     mc = 4
 
-    epochs = 10
+    epochs = 60000
 
     bayesian_fcn = BayesianFCN(n_input=2,n_layer=3, n_out=2, t_bound=[0, torch.pi / 2],
                                        x_bound=[-5, 5], prior_std=1)
