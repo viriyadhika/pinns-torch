@@ -1,5 +1,6 @@
 program: PINN_MCMC_Bayesian.py
 method: bayes_mcmc
+project: pinns-torch-PINN
 metric:
   name: loss        # <- this matches run.log["loss"]
   goal: minimize
