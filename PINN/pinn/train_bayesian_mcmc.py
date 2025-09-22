@@ -41,7 +41,7 @@ def sgld_step(model: SchrodingerModel, lr):
         p.add_( -0.5 * lr * p.grad + math.sqrt(lr) * noise )
 
 
-def train(wandb_run, lr=1e-5, sigma_w=1, beta_factor=1e-3):
+def train(wandb_run, lr=1e-5, sigma_w=1, beta_factor=1e-3, epochs=35000, burn_in=30000):
     os.makedirs("Data", exist_ok=True)
     url = "https://github.com/maziarraissi/PINNs/raw/master/main/Data/NLS.mat"
     r = requests.get(url)
@@ -72,8 +72,6 @@ def train(wandb_run, lr=1e-5, sigma_w=1, beta_factor=1e-3):
     
     
 
-    burn_in = 30000
-    epochs = 35000
     sample_every = 10
 
     schrodinger_model = SchrodingerModel(n_input=2,n_layer=3, n_out=2, t_bound=[0, torch.pi / 2],

@@ -22,4 +22,4 @@ run = wandb.init(
 config = wandb.config
 
 if __name__ == '__main__':
-    train(wandb_run=run, lr=config.lr, sigma_w=config.sigma_w, beta_factor=config.beta_factor)
+    train(wandb_run=run, lr=config.lr, sigma_w=config.sigma_w, beta_factor=config.beta_factor,epochs=10000, burn_in=10000)
