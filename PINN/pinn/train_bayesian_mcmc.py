@@ -41,7 +41,7 @@ def sgld_step(model: SchrodingerModel, lr):
         p.add_( -0.5 * lr * p.grad + math.sqrt(lr) * noise )
 
 
-def train(wandb_run, lr=1e-5, sigma_w=1, beta_factor=1e-3, epochs=35000, burn_in=30000):
+def train(wandb_run, lr=1e-5, sigma_w=1, clip_norm=1, beta_factor=1e-3, epochs=35000, burn_in=30000):
     os.makedirs("Data", exist_ok=True)
     url = "https://github.com/maziarraissi/PINNs/raw/master/main/Data/NLS.mat"
     r = requests.get(url)
@@ -94,6 +94,8 @@ def train(wandb_run, lr=1e-5, sigma_w=1, beta_factor=1e-3, epochs=35000, burn_in
         loss = data_loss + boundary_loss + f_loss + L_prior
 
         loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(schrodinger_model.parameters(), clip_norm)
 
         sgld_step(schrodinger_model, lr)
 
