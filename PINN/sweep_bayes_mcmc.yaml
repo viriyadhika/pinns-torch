@@ -1,4 +1,4 @@
-program: PINN_MCMC_Bayesian.py
+program: PINN_MCMC_Bayesian_sweep.py
 method: bayes_mcmc
 project: pinns-torch-PINN
 metric:
