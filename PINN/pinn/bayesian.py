@@ -9,38 +9,53 @@ import math
 class BayesianLinear(nn.Module):
     def __init__(self, in_features: int, out_features: int, prior_std: float):
         super().__init__()
-        # Mean and log variance of weight distribution
-        self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features).normal_(0, 0.1))
-        self.weight_logvar = nn.Parameter(torch.Tensor(out_features, in_features).normal_(-3, 0.1))
-        self.bias_mu = nn.Parameter(torch.zeros(out_features))
-        self.bias_logvar = nn.Parameter(torch.ones(out_features) * -3)
+        # Mean of weight distribution
+        self.weight_mu = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.bias_mu = nn.Parameter(torch.Tensor(out_features))
+
+        # Variance parametrized with rho (softplus → std)
+        self.weight_rho = nn.Parameter(torch.empty(out_features, in_features).uniform_(-5, -4))
+        self.bias_rho   = nn.Parameter(torch.empty(out_features).uniform_(-5, -4))
+
         self.prior_std = prior_std
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # Xavier initialization for means
+        nn.init.xavier_uniform_(self.weight_mu)
+        nn.init.zeros_(self.bias_mu)
 
     def forward(self, x, sample: bool = True):
+        weight_sigma = F.softplus(self.weight_rho)   # ensures >0
+        bias_sigma   = F.softplus(self.bias_rho)
+
         if sample:
             weight_eps = torch.randn_like(self.weight_mu)
-            bias_eps = torch.randn_like(self.bias_mu)
-            weight = self.weight_mu + torch.exp(0.5 * self.weight_logvar) * weight_eps
-            bias = self.bias_mu + torch.exp(0.5 * self.bias_logvar) * bias_eps
+            bias_eps   = torch.randn_like(self.bias_mu)
+            weight = self.weight_mu + weight_sigma * weight_eps
+            bias   = self.bias_mu + bias_sigma * bias_eps
         else:
             weight = self.weight_mu
-            bias  = self.bias_mu
+            bias   = self.bias_mu
+
         return F.linear(x, weight, bias)
-    
+
     def kl_divergence(self) -> torch.Tensor:
         prior_var = self.prior_std ** 2
-        post_var = torch.exp(self.weight_logvar)
+        weight_sigma = F.softplus(self.weight_rho)
+        bias_sigma   = F.softplus(self.bias_rho)
+
+        # KL between posterior N(mu, sigma²) and prior N(0, prior_std²)
         kl = 0.5 * (
-            (post_var + self.weight_mu**2) / prior_var
+            (weight_sigma.pow(2) + self.weight_mu.pow(2)) / prior_var
             - 1
-            + math.log(prior_var) - self.weight_logvar
+            + 2 * (math.log(self.prior_std) - torch.log(weight_sigma))
         ).sum()
-        # same for bias
-        post_var_bias = torch.exp(self.bias_logvar)
+
         kl += 0.5 * (
-            (post_var_bias + self.bias_mu**2) / prior_var
+            (bias_sigma.pow(2) + self.bias_mu.pow(2)) / prior_var
             - 1
-            + math.log(prior_var) - self.bias_logvar
+            + 2 * (math.log(self.prior_std) - torch.log(bias_sigma))
         ).sum()
         return kl
 
