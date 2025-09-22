@@ -86,7 +86,7 @@ if __name__ == '__main__':
             data_loss += dl / mc; boundary_loss += bl / mc; f_loss += fl / mc
 
         kl_divergence = beta_scaling * bayesian_fcn.kl_divergence()
-        loss = data_loss + boundary_loss + f_loss + kl_divergence
+        loss = 100 * data_loss + boundary_loss + f_loss + kl_divergence
 
         loss.backward()
 
