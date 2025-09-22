@@ -21,4 +21,4 @@ run = wandb.init(
 
 
 if __name__ == '__main__':
-    train(wandb_run=run, beta_factor=6e-4, lr=1e-4, sigma_w=2, epochs=35000, burn_in=30000)
+    train(wandb_run=run, beta_factor=0.0006572, lr=0.0000916, sigma_w=2, epochs=35000, burn_in=30000)
