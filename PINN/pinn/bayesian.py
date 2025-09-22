@@ -61,7 +61,7 @@ class BayesianFCN(nn.Module):
         :param discrete: If the problem is discrete or not.
         """
         super().__init__()
-        n_hidden = 50
+        n_hidden = 100
         self.x_lb: torch.Tensor
         self.x_ub: torch.Tensor
         self.t_lb: torch.Tensor
