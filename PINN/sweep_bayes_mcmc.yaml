@@ -1,5 +1,5 @@
 program: PINN_MCMC_Bayesian_sweep.py
-method: bayes_mcmc
+method: bayes
 project: pinns-torch-PINN
 metric:
   name: loss        # <- this matches run.log["loss"]
