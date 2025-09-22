@@ -1,0 +1,16 @@
+program: PINN_MCMC_Bayesian.py
+method: bayes_mcmc
+metric:
+  name: loss        # <- this matches run.log["loss"]
+  goal: minimize
+parameters:
+  lr:
+    distribution: log_uniform
+    min: -10
+    max: -5
+  beta_factor:
+    distribution: log_uniform
+    min: -10
+    max: -2
+  sigma_w:
+    values: [0.3, 0.5, 1.0, 2.0]

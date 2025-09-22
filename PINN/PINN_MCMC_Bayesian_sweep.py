@@ -19,6 +19,7 @@ run = wandb.init(
         name="Bayesian PINN"
 )
 
+config = wandb.config
 
 if __name__ == '__main__':
-    train(wandb_run=run)
+    train(wandb_run=run, lr=config.lr, sigma_w=config.sigma_w, beta_factor=config.beta_factor)
