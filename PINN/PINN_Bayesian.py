@@ -66,13 +66,54 @@ if __name__ == '__main__':
     mc = 2
     prior_std = 0.3
 
-    epochs = 60000
+    epochs = 15000
 
     bayesian_fcn = BayesianFCN(n_input=2,n_layer=3, n_out=2, t_bound=[0, torch.pi / 2],
                                        x_bound=[-5, 5], prior_std=prior_std)
     optimizer = torch.optim.Adam(bayesian_fcn.parameters(), lr=lr)
     bayesian_fcn.to(device)
 
+    for i in range(epochs):
+        optimizer.zero_grad()
+
+        
+        data_loss = boundary_loss = f_loss = torch.tensor(0.0, device=device)
+        data_loss = torch.tensor(0., device=device)
+        boundary_loss = torch.tensor(0., device=device)
+        f_loss = torch.tensor(0., device=device)
+        for _ in range(mc):
+            dl, bl, fl = get_loss(bayesian_fcn, schrodinger_data)
+            data_loss += dl / mc; boundary_loss += bl / mc; f_loss += fl / mc
+
+        kl_divergence = beta_scaling * bayesian_fcn.kl_divergence()
+        loss = data_loss + boundary_loss + f_loss
+
+        loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(bayesian_fcn.parameters(), clip_norm)
+
+        optimizer.step()
+
+        run.log({
+            'loss': loss.item(),
+            'boundary_loss': boundary_loss.item(),
+            'pde_loss': f_loss.item(),
+            'data_loss': data_loss.item(),
+            'kl_div': kl_divergence.item()
+        })
+
+        if i % 1000 == 0:
+            logging.info(loss)
+            os.makedirs("Bayesian", exist_ok=True)
+            checkpoint_path = f"Bayesian/schrodinger_model-{i}.pt"
+            torch.save({
+                'model_state_dict': bayesian_fcn.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'epoch': i,                # optional: last completed epoch
+            }, checkpoint_path)
+            logging.info(f"Checkpoint saved to {checkpoint_path}")
+
+    
     for i in range(epochs):
         optimizer.zero_grad()
 
