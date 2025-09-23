@@ -209,9 +209,9 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
 # --------------------------
 # Start conservatively; you can increase step_size or L later.
 step_size = 5e-6
-L = 10
-burn = 10000
-num_samples = 15000
+L = 5
+burn = 800
+num_samples = 2000
 
 # --------------------------
 # Run HMC
