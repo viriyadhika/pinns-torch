@@ -96,6 +96,45 @@ class SchrodingerData:
         return t_low_boundary, x_low_boundary, t_high_boundary, x_high_boundary
 
 
+class SchrodingerHMCModel(nn.Module):
+    def __init__(self, n_input: int, n_layer: int, n_out: int, x_bound: list[float], t_bound: list[float]):
+        super().__init__()
+        n_hidden = 100
+        # store bounds for scaling
+        self.x_lb = float(x_bound[0])
+        self.x_ub = float(x_bound[1])
+        self.t_lb = float(t_bound[0])
+        self.t_ub = float(t_bound[1])
+        
+        self.first = self.block(n_input, n_hidden)
+        self.hidden = nn.Sequential(*[self.block(n_hidden, n_hidden) for i in range(n_layer) ])
+        self.last = nn.Linear(n_hidden, n_out)
+
+        self.apply(self._init_weights)
+
+    def block(self, n_input, n_hidden):
+        return nn.Sequential(*[
+            nn.Linear(n_input, n_hidden),
+            nn.Tanh()
+        ])
+
+    def _init_weights(self, module):
+        """Apply Xavier initialization to linear layers"""
+        if isinstance(module, nn.Linear):
+            # Xavier uniform initialization (also called Glorot uniform)
+            nn.init.xavier_uniform_(module.weight)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
+
+    def forward(self, x, t):
+        x_scaled = 2.0 * (x - self.x_lb) / (self.x_ub - self.x_lb) - 1.0
+        t_scaled = 2.0 * (t - self.t_lb) / (self.t_ub - self.t_lb) - 1.0
+        X = torch.cat([x_scaled, t_scaled], dim=1)
+        return self.last(self.hidden(self.first(X)))
+
+
+
+
 class SchrodingerModel(nn.Module):
     def __init__(self, n_input: int, n_layer: int, n_out: int, x_bound: list[float], t_bound: list[float]):
         super().__init__()
