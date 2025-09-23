@@ -11,8 +11,9 @@ import torch
 from torch import nn
 
 import hamiltorch
-from pinn.lib import SchrodingerModel, SchrodingerData, Util
+from pinn.lib import SchrodingerHMCModel, SchrodingerData, Util
 import util as bpinns_util  # <-- your B-PINNs util with sample_model_bpinns
+import wandb
 
 # --------------------------
 # Setup
@@ -20,6 +21,12 @@ import util as bpinns_util  # <-- your B-PINNs util with sample_model_bpinns
 logging.basicConfig(
     filename='hmc_log.log', level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
+)
+run = wandb.init(
+        reinit="finish_previous",
+        entity="viriyadhika1",
+        project="pinn-lab1",
+        name="HMC"
 )
 device = "cuda" if torch.cuda.is_available() else "cpu"
 hamiltorch.set_random_seed(42)
@@ -112,7 +119,7 @@ bayes_data = {
 # --------------------------
 # Model
 # --------------------------
-net = SchrodingerModel(
+net = SchrodingerHMCModel(
     n_input=2, n_layer=3, n_out=2,
     t_bound=t_bound, x_bound=x_bound
 ).to(device)
@@ -150,7 +157,7 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
     # ---- Data term (measurements at t=0): MSE on [u,v]
     pred_data = fmodel[0](x_d, t_d, params=params_unflattened[0])  # [N,2]
     _guard(pred_data, y_d)
-    ll = -0.5 * tau_data * torch.sum((pred_data - y_d)**2)
+    ll = -0.5 * tau_data * torch.mean((pred_data - y_d)**2)
 
     # ---- Periodic boundary: match function & first derivative across x endpoints
     pred_low  = fmodel[0](x_lb, t_lb, params=params_unflattened[0])  # [Nb,2]
@@ -166,7 +173,7 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
     bnd_err = (u_low - u_high)**2 + (v_low - v_high)**2 \
             + (u_x_low - u_x_high)**2 + (v_x_low - v_x_high)**2
     _guard(bnd_err)
-    ll = ll - 0.5 * tau_bnd * torch.sum(bnd_err)
+    ll = ll - 0.5 * tau_bnd * torch.mean(bnd_err)
 
     # ---- PDE residual (f_u, f_v) at collocation
     pred_f = fmodel[0](x_c, t_c, params=params_unflattened[0])  # [Nf,2]
@@ -184,7 +191,14 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
     f_v = v_t - 0.5 * u_xx - (u**2 + v**2) * u
     pde_res = f_u**2 + f_v**2
     _guard(pde_res)
-    ll = ll - 0.5 * tau_pde * torch.sum(pde_res)
+    ll = ll - 0.5 * tau_pde * torch.mean(pde_res)
+
+    run.log({
+        'loss': ll.item(),
+        'boundary_loss': torch.mean(bnd_err),
+        'pde_loss': torch.mean(pde_res),
+        'data_loss': torch.mean(pred_data)
+    })
 
     # Return outputs for optional inspection
     return ll, [pred_data, pred_low, pred_high, pred_f]
@@ -195,8 +209,8 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
 # Start conservatively; you can increase step_size or L later.
 step_size = 5e-6
 L = 10
-burn = 1
-num_samples = 2
+burn = 10000
+num_samples = 15000
 
 # --------------------------
 # Run HMC
