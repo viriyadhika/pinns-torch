@@ -157,7 +157,8 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
     # ---- Data term (measurements at t=0): MSE on [u,v]
     pred_data = fmodel[0](x_d, t_d, params=params_unflattened[0])  # [N,2]
     _guard(pred_data, y_d)
-    ll = -0.5 * tau_data * torch.mean((pred_data - y_d)**2)
+    pred_err = (pred_data - y_d)**2
+    ll = -0.5 * tau_data * torch.mean(pred_err)
 
     # ---- Periodic boundary: match function & first derivative across x endpoints
     pred_low  = fmodel[0](x_lb, t_lb, params=params_unflattened[0])  # [Nb,2]
@@ -197,7 +198,7 @@ def schrodinger_model_loss(data, fmodel, params_unflattened, tau_likes, gradient
         'loss': ll.item(),
         'boundary_loss': torch.mean(bnd_err),
         'pde_loss': torch.mean(pde_res),
-        'data_loss': torch.mean(pred_data)
+        'data_loss': torch.mean(pred_err)
     })
 
     # Return outputs for optional inspection
