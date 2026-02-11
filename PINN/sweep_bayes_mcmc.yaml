@@ -1,0 +1,18 @@
+program: PINN_MCMC_Bayesian_sweep.py
+method: bayes
+project: pinns-torch-PINN
+entity: viriyadhika1
+metric:
+  name: loss        # <- this matches run.log["loss"]
+  goal: minimize
+parameters:
+  lr:
+    distribution: log_uniform
+    min: -10
+    max: -5
+  beta_factor:
+    distribution: log_uniform
+    min: -10
+    max: -3
+  sigma_w:
+    values: [0.3, 0.5, 1.0, 2.0]

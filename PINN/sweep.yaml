@@ -1,0 +1,20 @@
+program: PINN-Bayesian.py
+method: bayes
+metric:
+  name: loss        # <- this matches run.log["loss"]
+  goal: minimize
+parameters:
+  lr:
+    distribution: log_uniform
+    min: -10
+    max: -5
+  beta_scaling:
+    distribution: log_uniform
+    min: -10
+    max: -5
+  prior_std:
+    values: [0.3, 0.5, 1.0, 2.0]
+  mc:
+    values: [1, 2, 4]
+  clip_norm:
+    values: [0.5, 1.0, 5.0]
